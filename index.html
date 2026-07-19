@@ -1,8 +1,451 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Original Tactical FPS</title>
-<style>body{margin:0;background:#111;color:#fff;font-family:Arial,Helvetica,sans-serif;display:grid;place-items:center;height:100vh}h1{font-size:3rem}p{opacity:.8}</style>
-</head><body><main><h1>Original Tactical FPS</h1><p>Project started.</p></main></body></html>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browser Voxels</title>
+  <style>
+    :root {
+      --bg: #87c9ff;
+      --panel: rgba(10, 14, 18, 0.72);
+      --panel-border: rgba(255, 255, 255, 0.14);
+      --text: #f4f7fb;
+      --muted: #cbd5e1;
+      --accent: #7dd3fc;
+    }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(#8fd3ff, #cfefff 55%, #e9f7ff);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      user-select: none;
+      cursor: crosshair;
+    }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    .hud {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(10px);
+      border-radius: 14px;
+      padding: 12px 14px;
+      max-width: min(420px, calc(100vw - 28px));
+      box-shadow: 0 16px 40px rgba(0,0,0,.22);
+      pointer-events: none;
+    }
+    .hud h1 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      line-height: 1.1;
+      letter-spacing: 0.3px;
+    }
+    .hud p { margin: 4px 0; font-size: 13px; color: var(--muted); }
+    .hud b { color: white; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #dbeafe;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 999px; background: var(--accent);
+      box-shadow: 0 0 16px var(--accent);
+    }
+    .crosshair {
+      position: fixed;
+      left: 50%; top: 50%;
+      width: 16px; height: 16px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: .9;
+    }
+    .crosshair::before, .crosshair::after {
+      content: "";
+      position: absolute;
+      left: 50%; top: 50%;
+      background: rgba(255,255,255,.95);
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      box-shadow: 0 0 8px rgba(0,0,0,.3);
+    }
+    .crosshair::before { width: 16px; height: 2px; }
+    .crosshair::after { width: 2px; height: 16px; }
+    .hotbar {
+      position: fixed;
+      left: 50%; bottom: 18px;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      padding: 10px;
+      background: rgba(10, 14, 18, 0.66);
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 40px rgba(0,0,0,.22);
+    }
+    .slot {
+      width: 54px; height: 54px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(255,255,255,.06);
+      position: relative;
+      overflow: hidden;
+    }
+    .slot.active {
+      outline: 2px solid rgba(125, 211, 252, .9);
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, .15), inset 0 0 0 1px rgba(255,255,255,.15);
+    }
+    .slot .chip {
+      position: absolute;
+      left: 8px; right: 8px; bottom: 8px;
+      height: 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      opacity: .95;
+    }
+    .tip {
+      position: fixed;
+      right: 14px; top: 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      max-width: 300px;
+      font-size: 13px;
+      color: var(--muted);
+      box-shadow: 0 16px 40px rgba(0,0,0,.22);
+    }
+    .tip b { color: white; }
+    @media (max-width: 700px) {
+      .tip { display: none; }
+      .hud { max-width: calc(100vw - 28px); }
+      .slot { width: 44px; height: 44px; border-radius: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div class="crosshair"></div>
+  <div class="hud">
+    <h1>Browser Voxels</h1>
+    <p><b>WASD</b> move · <b>Space</b> jump · <b>Mouse</b> look</p>
+    <p><b>Left click</b> break block · <b>Right click</b> place block</p>
+    <p><b>1–6</b> select block · <b>Shift</b> sprint</p>
+    <div class="badge"><span class="dot"></span><span>Playable prototype in one file</span></div>
+  </div>
+  <div class="tip">
+    <b>Goal:</b> explore, build, and break blocks in a small voxel world.<br><br>
+    This is a lightweight Minecraft-style starter that runs directly in the browser and can be expanded into survival, inventory, mobs, saving, and chunk loading.
+  </div>
+  <div class="hotbar" id="hotbar"></div>
+
+  <script>
+  (() => {
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const hotbar = document.getElementById('hotbar');
+
+    const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    let W = 0, H = 0;
+    function resize() {
+      W = Math.floor(innerWidth * DPR);
+      H = Math.floor(innerHeight * DPR);
+      canvas.width = W;
+      canvas.height = H;
+      canvas.style.width = innerWidth + 'px';
+      canvas.style.height = innerHeight + 'px';
+    }
+    addEventListener('resize', resize, { passive: true });
+    resize();
+
+    const blocks = [
+      { name: 'Grass', color: '#57b957' },
+      { name: 'Dirt', color: '#8b5a2b' },
+      { name: 'Stone', color: '#8a95a3' },
+      { name: 'Sand', color: '#d8c08a' },
+      { name: 'Wood', color: '#9a6538' },
+      { name: 'Brick', color: '#b04b4b' },
+    ];
+
+    let selected = 0;
+    function renderHotbar() {
+      hotbar.innerHTML = '';
+      blocks.forEach((b, i) => {
+        const slot = document.createElement('div');
+        slot.className = 'slot' + (i === selected ? ' active' : '');
+        slot.innerHTML = `<span>${i + 1}</span><div class="chip" style="background:${b.color}"></div>`;
+        hotbar.appendChild(slot);
+      });
+    }
+    renderHotbar();
+
+    const world = new Map();
+    const key = (x, y, z) => `${x}|${y}|${z}`;
+    const solid = (x, y, z) => world.has(key(x, y, z));
+    const setBlock = (x, y, z, t) => world.set(key(x, y, z), t);
+    const removeBlock = (x, y, z) => world.delete(key(x, y, z));
+
+    const size = { x: 24, y: 10, z: 24 };
+    for (let x = -size.x; x <= size.x; x++) {
+      for (let z = -size.z; z <= size.z; z++) {
+        const h = Math.floor(2 + 2 * Math.sin(x * 0.35) + 2 * Math.cos(z * 0.28));
+        for (let y = -2; y <= h; y++) {
+          const type = y === h ? 0 : (y > h - 3 ? 1 : 2);
+          setBlock(x, y, z, type);
+        }
+        if ((x + z) % 13 === 0 && h > 0) setBlock(x, h + 1, z, 4);
+      }
+    }
+
+    const player = {
+      x: 0,
+      y: 8,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      yaw: 0.8,
+      pitch: -0.2,
+      onGround: false,
+      sprint: false,
+    };
+
+    const keys = new Set();
+    addEventListener('keydown', (e) => {
+      keys.add(e.code);
+      if (e.code.startsWith('Digit')) {
+        const n = Number(e.code.replace('Digit', ''));
+        if (n >= 1 && n <= 6) {
+          selected = n - 1;
+          renderHotbar();
+        }
+      }
+      if (e.code === 'Escape') document.exitPointerLock?.();
+    });
+    addEventListener('keyup', (e) => keys.delete(e.code));
+
+    canvas.addEventListener('click', () => canvas.requestPointerLock?.());
+    addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement === canvas) {
+        player.yaw -= e.movementX * 0.0022;
+        player.pitch -= e.movementY * 0.0022;
+        player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
+      }
+    });
+
+    addEventListener('contextmenu', (e) => e.preventDefault());
+
+    function hashNoise(x, z) {
+      const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453123;
+      return s - Math.floor(s);
+    }
+
+    function raycast(maxDist = 7) {
+      const step = 0.08;
+      const dx = Math.cos(player.pitch) * Math.sin(player.yaw);
+      const dy = Math.sin(player.pitch);
+      const dz = Math.cos(player.pitch) * Math.cos(player.yaw);
+      let px = player.x, py = player.y + 1.5, pz = player.z;
+      let prev = null;
+      for (let t = 0; t < maxDist; t += step) {
+        const bx = Math.floor(px), by = Math.floor(py), bz = Math.floor(pz);
+        if (solid(bx, by, bz)) return { hit: { x: bx, y: by, z: bz }, prev };
+        prev = { x: bx, y: by, z: bz };
+        px += dx * step; py += dy * step; pz += dz * step;
+      }
+      return null;
+    }
+
+    addEventListener('mousedown', (e) => {
+      const hit = raycast();
+      if (!hit) return;
+      if (e.button === 0) {
+        removeBlock(hit.hit.x, hit.hit.y, hit.hit.z);
+      } else if (e.button === 2 && hit.prev) {
+        const { x, y, z } = hit.prev;
+        if (!solid(x, y, z)) setBlock(x, y, z, selected);
+      }
+    });
+
+    function intersectsBlock(px, py, pz, bx, by, bz) {
+      return px > bx && px < bx + 1 && py > by && py < by + 1 && pz > bz && pz < bz + 1;
+    }
+
+    function moveAndCollide(dt) {
+      const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 7.5 : 5.2);
+      player.sprint = speed > 6;
+      let ax = 0, az = 0;
+      if (keys.has('KeyW')) { ax += Math.sin(player.yaw); az += Math.cos(player.yaw); }
+      if (keys.has('KeyS')) { ax -= Math.sin(player.yaw); az -= Math.cos(player.yaw); }
+      if (keys.has('KeyA')) { ax -= Math.cos(player.yaw); az += Math.sin(player.yaw); }
+      if (keys.has('KeyD')) { ax += Math.cos(player.yaw); az -= Math.sin(player.yaw); }
+      const len = Math.hypot(ax, az) || 1;
+      ax = (ax / len) * speed;
+      az = (az / len) * speed;
+      player.vx = ax;
+      player.vz = az;
+      if (player.onGround && keys.has('Space')) player.vy = 6.8;
+      player.vy -= 18 * dt;
+
+      const nextX = player.x + player.vx * dt;
+      const nextZ = player.z + player.vz * dt;
+      const nextY = player.y + player.vy * dt;
+
+      let px = nextX, py = player.y, pz = player.z;
+      if (!collides(px, py, pz)) player.x = px;
+      px = player.x; py = player.y; pz = nextZ;
+      if (!collides(px, py, pz)) player.z = pz;
+      px = player.x; py = nextY; pz = player.z;
+      if (!collides(px, py, pz)) {
+        player.onGround = false;
+        player.y = py;
+      } else {
+        if (player.vy < 0) player.onGround = true;
+        player.vy = 0;
+      }
+    }
+
+    function collides(px, py, pz) {
+      const minX = Math.floor(px - 0.28), maxX = Math.floor(px + 0.28);
+      const minY = Math.floor(py), maxY = Math.floor(py + 1.8);
+      const minZ = Math.floor(pz - 0.28), maxZ = Math.floor(pz + 0.28);
+      for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+          for (let z = minZ; z <= maxZ; z++) {
+            if (solid(x, y, z)) {
+              const cx = x + 0.5, cy = y + 0.5, cz = z + 0.5;
+              const dx = Math.abs(px - cx), dy = Math.abs(py + 0.9 - cy), dz = Math.abs(pz - cz);
+              if (dx < 0.78 && dy < 1.35 && dz < 0.78) return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function project(x, y, z) {
+      const dx = x - player.x;
+      const dy = y - (player.y + 1.4);
+      const dz = z - player.z;
+      const cy = Math.cos(player.yaw), sy = Math.sin(player.yaw);
+      const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
+      const x1 = cy * dx - sy * dz;
+      const z1 = sy * dx + cy * dz;
+      const y2 = cp * dy - sp * z1;
+      const z2 = sp * dy + cp * z1;
+      if (z2 <= 0.08) return null;
+      const f = Math.min(W, H) * 0.9;
+      return {
+        x: W / 2 + (x1 / z2) * f,
+        y: H / 2 + (y2 / z2) * f,
+        z: z2,
+      };
+    }
+
+    function drawBlock(x, y, z, type) {
+      const p = project(x + 0.5, y + 0.5, z + 0.5);
+      if (!p) return;
+      const s = Math.max(2, 58 / p.z);
+      const base = blocks[type % blocks.length].color;
+      const shade = Math.max(0.45, Math.min(1, 1.3 - p.z * 0.08));
+      ctx.fillStyle = shadeColor(base, shade);
+      ctx.strokeStyle = 'rgba(0,0,0,.18)';
+      ctx.lineWidth = Math.max(1, s * 0.06);
+      ctx.beginPath();
+      ctx.roundRect(p.x - s / 2, p.y - s / 2, s, s, Math.max(2, s * 0.12));
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255,255,255,.08)';
+      ctx.fillRect(p.x - s / 2 + 2, p.y - s / 2 + 2, s * 0.34, s * 0.34);
+    }
+
+    function shadeColor(hex, factor) {
+      const n = hex.replace('#', '');
+      const r = parseInt(n.slice(0, 2), 16);
+      const g = parseInt(n.slice(2, 4), 16);
+      const b = parseInt(n.slice(4, 6), 16);
+      const rr = Math.max(0, Math.min(255, Math.round(r * factor)));
+      const gg = Math.max(0, Math.min(255, Math.round(g * factor)));
+      const bb = Math.max(0, Math.min(255, Math.round(b * factor)));
+      return `rgb(${rr},${gg},${bb})`;
+    }
+
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
+
+      moveAndCollide(dt);
+
+      ctx.clearRect(0, 0, W, H);
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#90d8ff');
+      grad.addColorStop(0.55, '#d7f2ff');
+      grad.addColorStop(1, '#ecf9ff');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // sun glow
+      const sunX = W * 0.78, sunY = H * 0.16;
+      const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, H * 0.22);
+      glow.addColorStop(0, 'rgba(255,255,255,.9)');
+      glow.addColorStop(0.2, 'rgba(255,245,200,.35)');
+      glow.addColorStop(1, 'rgba(255,245,200,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(sunX, sunY, H * 0.22, 0, Math.PI * 2); ctx.fill();
+
+      const visible = [];
+      const range = 14;
+      const px = Math.floor(player.x), py = Math.floor(player.y), pz = Math.floor(player.z);
+      for (let x = px - range; x <= px + range; x++) {
+        for (let y = py - 7; y <= py + 8; y++) {
+          for (let z = pz - range; z <= pz + range; z++) {
+            const t = world.get(key(x, y, z));
+            if (t !== undefined) {
+              const p = project(x + 0.5, y + 0.5, z + 0.5);
+              if (p) visible.push({ x, y, z, t, d: p.z });
+            }
+          }
+        }
+      }
+      visible.sort((a, b) => b.d - a.d);
+      for (const b of visible) drawBlock(b.x, b.y, b.z, b.t);
+
+      // hand / tool silhouette
+      ctx.fillStyle = 'rgba(10,14,18,.55)';
+      ctx.beginPath();
+      ctx.roundRect(W * 0.76, H * 0.75, W * 0.18, H * 0.18, 18 * DPR);
+      ctx.fill();
+      ctx.fillStyle = shadeColor(blocks[selected].color, 0.85);
+      ctx.beginPath();
+      ctx.roundRect(W * 0.79, H * 0.78, W * 0.12, H * 0.09, 14 * DPR);
+      ctx.fill();
+
+      // simple vignette
+      const vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.1, W/2, H/2, Math.max(W,H)*0.7);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,.16)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0,0,W,H);
+
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
+</html>
